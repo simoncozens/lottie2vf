@@ -82,6 +82,7 @@ def add_glyphs(fb, glyphs):
         # created=timestampSinceEpoch(f.date.timestamp()),
         lowestRecPPEM=10,
     )
+    fb.setupPost()
 
     pass
 
