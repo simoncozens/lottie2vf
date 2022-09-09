@@ -1,5 +1,7 @@
 import logging
 import math
+from lottie.utils.transform import TransformMatrix
+
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +133,13 @@ def position_to_paint(transform, paint, animation):
 
 
 def matrix_to_paint(matrix, paint):
-    if transform.to_matrix(0).to_css_2d() == TransformMatrix().to_css_2d():
+    if matrix.to_css_2d() == TransformMatrix().to_css_2d():
         return paint
-    # XXX
-    
+    return f"""PaintTransform((
+        {matrix.a}, { matrix.b }, {matrix.c}, {matrix.d},
+        {matrix.tx}, { matrix. ty}
+    ), {paint} )"""
+
 
 def apply_transform_to_paint(transform, paint, animation):
     frames = (
@@ -142,8 +147,8 @@ def apply_transform_to_paint(transform, paint, animation):
         + (transform.position.keyframes or [])
         + (transform.rotation.keyframes or [])
     )
-    # if not frames:
-    #     return matrix_to_paint(transform.to_matrix(0), paint)
+    if not frames:
+        return matrix_to_paint(transform.to_matrix(0), paint)
 
     return scale_to_paint(
         transform,
