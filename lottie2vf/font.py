@@ -48,8 +48,14 @@ def add_glyphs(fb, glyphs):
             keyframes = list(sorted(glyph["variations"].keys()))
             glyphs_to_quadratic(glyph["variations"].values(), reverse_direction=True)
             glyph["base"] = glyph["variations"][keyframes[0]]
-            model = VariationModel([{"ANIM": k / fb._an.out_point} for k in keyframes])
+            frames = [{"ANIM": k / fb._an.out_point} for k in keyframes]
             ttglyphs = []
+            if {"ANIM": 0} not in frames:
+                pen = TTGlyphPen(None)
+                glyph["base"].draw(pen)
+                ttglyphs.append(pen.glyph())
+                frames.insert(0, {"ANIM": 0})
+            model = VariationModel(frames)
             for k in keyframes:
                 pen = TTGlyphPen(None)
                 glyph["variations"][k].draw(pen)

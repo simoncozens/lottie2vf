@@ -17,12 +17,13 @@ def compile_color(c):
 def compile_colors(colors):
     return [compile_color(c) for c in colors]
 
+
 def string_to_var_scalar(s, font, f2dot14=False):
-    converter = lambda x:float(x)
+    converter = lambda x: float(x)
     if f2dot14:
-        converter = lambda x:floatToFixed(float(x), 14)
+        converter = lambda x: floatToFixed(float(x), 14)
     if not isinstance(s, str):
-        s = "ANIM:0="+str(s)
+        s = "ANIM:0=" + str(s)
     v = VariableScalar()
     v.axes = font["fvar"].axes
     for location, value in re.findall(r"ANIM:([\d\.]+)=(\S+)", s):
@@ -32,6 +33,7 @@ def string_to_var_scalar(s, font, f2dot14=False):
         v.add_value({"ANIM": 0}, converter(first[1]))
     return v
 
+
 def devariablize(val):
     if not isinstance(val, str):
         return val
@@ -39,6 +41,7 @@ def devariablize(val):
     if not m:
         raise ValueError(f"Bad variable value {val}")
     return float(m[1])
+
 
 class PythonBuilder:
     def __init__(self, font) -> None:
@@ -55,11 +58,20 @@ class PythonBuilder:
             self.palette.append(color)
         return self.palette.index(color)
 
-    def PaintGlyph(self, glyph, paint=None):
-        return {"Format": 10, "Glyph": glyph, "Paint": paint}
-
     def PaintColrLayers(self, layers):
         return {"Format": 1, "Layers": layers}
+
+    def PaintLinearGradient(self, pt0, pt1, pt2, colorline):
+        return {
+            "Format": 4,
+            "x0": pt0[0],
+            "y0": pt0[1],
+            "x1": pt1[0],
+            "y1": pt1[1],
+            "x2": pt2[0],
+            "y2": pt2[1],
+            "ColorLine": colorline,
+        }
 
     def PaintSolid(self, col_or_colrs, alpha=1.0):
         return {
@@ -67,6 +79,22 @@ class PythonBuilder:
             "PaletteIndex": self.get_palette_index(col_or_colrs),
             "Alpha": alpha,
         }
+
+    def PaintSweepGradient(self, pt, startAngle, endAngle, colorline):
+        return {
+            "Format": 8,
+            "centerX": pt[0],
+            "centerY": pt[1],
+            "startAngle": startAngle,
+            "endAngle": endAngle,
+            "ColorLine": colorline,
+        }
+
+    def PaintGlyph(self, glyph, paint=None):
+        return {"Format": 10, "Glyph": glyph, "Paint": paint}
+
+    def PaintTranslate(self, dx, dy, paint):
+        return {"Format": 14, "dx": dx, "dy": dy, "Paint": paint}
 
     def PaintVarTranslate(self, dx, dy, paint):
         base = len(self.deltaset)
@@ -77,11 +105,14 @@ class PythonBuilder:
         vs = string_to_var_scalar(dy, self.font, f2dot14=False)
         dy_def, dy_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(dy_index)
-        
-        return {"Format": 15, "dx": dx_def, "dy": dy_def, "Paint": paint, "VarIndexBase": base}
 
-    def PaintTranslate(self, dx, dy, paint):
-        return {"Format": 14, "dx": dx, "dy": dy, "Paint": paint}
+        return {
+            "Format": 15,
+            "dx": dx_def,
+            "dy": dy_def,
+            "Paint": paint,
+            "VarIndexBase": base,
+        }
 
     def PaintScaleAroundCenter(self, scale_x, scale_y, center, paint):
         return {
@@ -101,41 +132,35 @@ class PythonBuilder:
         vs = string_to_var_scalar(scale_y, self.font, f2dot14=True)
         y_def, y_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(y_index)
-        _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(self.varstorebuilder)
-        _, cy_ix = string_to_var_scalar(0, self.font).add_to_variation_store(self.varstorebuilder)
+        _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+            self.varstorebuilder
+        )
+        _, cy_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+            self.varstorebuilder
+        )
         self.deltaset.append(cx_ix)
         self.deltaset.append(cy_ix)
 
         return {
             "Format": 19,
-            "scaleX": fixedToFloat(x_def,14),
-            "scaleY": fixedToFloat(y_def,14),
+            "scaleX": fixedToFloat(x_def, 14),
+            "scaleY": fixedToFloat(y_def, 14),
             "centerX": center[0],
             "centerY": center[1],
             "Paint": paint,
-            "VarIndexBase": base
+            "VarIndexBase": base,
         }
 
-    def PaintLinearGradient(self, pt0, pt1, pt2, colorline):
-        return {
-            "Format": 4,
-            "x0": pt0[0],
-            "y0": pt0[1],
-            "x1": pt1[0],
-            "y1": pt1[1],
-            "x2": pt2[0],
-            "y2": pt2[1],
-            "ColorLine": colorline,
-        }
+    def PaintRotate(self, angle, paint):
+        return {"Format": 24, "angle": angle, "Paint": paint}
 
-    def PaintSweepGradient(self, pt, startAngle, endAngle, colorline):
+    def PaintRotateAroundCenter(self, angle, center, paint):
         return {
-            "Format": 8,
-            "centerX": pt[0],
-            "centerY": pt[1],
-            "startAngle": startAngle,
-            "endAngle": endAngle,
-            "ColorLine": colorline,
+            "Format": 26,
+            "angle": angle,
+            "centerX": center[0],
+            "centerY": center[1],
+            "Paint": paint,
         }
 
     def ColorLine(self, start_or_stops, end=None, extend="pad"):
@@ -163,10 +188,11 @@ class PythonBuilder:
         store = self.varstorebuilder.finish()
         mapping = store.optimize()
         self.deltaset = [mapping[v] for v in self.deltaset]
-        self.font["COLR"] = buildCOLR(glyphs,
-            varStore = store,
-            varIndexMap = buildDeltaSetIndexMap(self.deltaset),
-            version=1
+        self.font["COLR"] = buildCOLR(
+            glyphs,
+            varStore=store,
+            varIndexMap=buildDeltaSetIndexMap(self.deltaset),
+            version=1,
         )
 
 

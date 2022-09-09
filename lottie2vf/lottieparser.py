@@ -5,6 +5,7 @@ import json
 import sys
 import logging
 from babelfont import Layer
+import math
 
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,15 @@ def animated_value_to_ot(keyframes):
             [
                 keyframes[0].start.components[ix] == k.start.components[ix]
                 for k in keyframes
+                if k.start
             ]
         ):
             # This isn't animated
             values[ix] = keyframes[0].start.components[ix]
         else:
             for k in keyframes:
+                if not k.start:
+                    continue
                 v = k.start.components[ix]
                 values[ix] += f"ANIM:{k.time}={v} "
             values[ix] = f'"{values[ix]}"'
@@ -61,7 +65,7 @@ def scale_to_paint(transform, paint):
         raise NotImplementedError
 
     if has_anchor:
-        return f"PaintVarScaleAroundCenter( {animated_scale[0]}, {animated_scale[1]}, ({anchor.value.x / 100}, {anchor.value.y / 100}), {paint})"
+        return f"PaintVarScaleAroundCenter( {animated_scale[0]}, {animated_scale[1]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
     else:
         return f"PaintVarScale( {animated_scale[0]}, {animated_scale[1]}, {paint})"
 
@@ -77,9 +81,14 @@ def rotation_to_paint(transform, paint):
     if not animated and rotation.value == 0.0:
         return paint
 
-    import IPython
+    if animated:
+        raise NotImplementedError
 
-    IPython.embed()
+    angle = math.radians(rotation.value) / math.pi
+    if has_anchor:
+        return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x / 100}, {anchor.value.y / 100}), {paint})"
+    else:
+        return f"PaintRotate( {angle}, {paint})"
 
 
 def position_to_paint(transform, paint, animation):
@@ -106,15 +115,22 @@ def apply_transform_to_paint(transform, paint, animation):
     )
 
 
+def color_to_string(color):
+    return "#%02X%02X%02X%02X" % tuple([int(x * 255) for x in color.components])
+
+
 def fill_to_paint(fill):
     if not fill:
         return
-    if fill.color.animated:
+    if isinstance(fill, objects.GradientFill):
+        return gradient_fill_to_paint(fill)
+    if color.animated:
         logger.warning(f"Animated colour not supported")
-        color = fill.color.get_value(0) * 255
+        color = color.get_value(0)
     else:
-        color = fill.color.value * 255
-    color_string = "#%02X%02X%02X%02X" % tuple([int(x) for x in color.components])
+        color = color.value
+
+    color_string = color_to_string(fill.color)
 
     if fill.opacity.animated:
         raise NotImplementedError
@@ -123,6 +139,19 @@ def fill_to_paint(fill):
         alpha = f", alpha={fill.opacity.value/100}"
 
     return f"PaintSolid( '{color_string}'{alpha} )"
+
+
+def gradient_fill_to_paint(fill):
+    if fill.gradient_type != objects.shapes.GradientType.Linear:
+        return NotImplementedError
+    line = {stop: color_to_string(col) for stop, col in fill.colors.get_stops(None)}
+    if fill.start_point.animated or fill.end_point.animated:
+        return NotImplementedError
+    start_x, start_y = fill.start_point.get_value(0).components[:2]
+    end_x, end_y = fill.end_point.get_value(0).components[:2]
+    angle = (fill.start_point.value - fill.end_point.value).polar_angle + math.pi / 2
+    mid_x, mid_y = start_x + math.cos(angle) * 10, start_y + math.sin(angle) * 10
+    return f"PaintLinearGradient( ({start_x},{start_y}), ({end_x}, {end_y}), ({mid_x}, {mid_y}), ColorLine({line}))"
 
 
 def paint_all_shapes(shapes, fill):
@@ -153,12 +182,12 @@ def bez_to_layer(path, t):
         qto = bez.vertices[i]
         h2 = _bezier_tangent(bez.in_tangents[i]) + qto
         pen.curveTo(h1.components[:2], h2.components[:2], qto.components[:2])
-    # if bez.closed:
-    #     qfrom = bez.vertices[-1]
-    #     h1 = _bezier_tangent(bez.out_tangents[-1]) + qfrom
-    #     qto = bez.vertices[0]
-    #     h2 = _bezier_tangent(bez.in_tangents[0]) + qto
-    #     pen.curveTo(h1.components[:2], h2.components[:2], qto.components[:2])
+    if bez.closed:
+        qfrom = bez.vertices[-1]
+        h1 = _bezier_tangent(bez.out_tangents[-1]) + qfrom
+        qto = bez.vertices[0]
+        h2 = _bezier_tangent(bez.in_tangents[0]) + qto
+        pen.curveTo(h1.components[:2], h2.components[:2], qto.components[:2])
     pen.closePath()
     return layer
 
@@ -217,6 +246,9 @@ class LottieParser(restructure.AbstractBuilder):
         # print("Visiting shapegroup", group, dom_parent)
         group.paths = []
         self.shapegroup_process_children(group, dom_parent)
+        if not group.fill:
+            logger.warn("Shape group with no fill in " + str(group))
+            return
         # Check fill, lottie.transform, layer transform
         res = apply_transform_to_paint(
             dom_parent["layer_transform"],
