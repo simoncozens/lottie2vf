@@ -18,10 +18,11 @@ def compile_colors(colors):
     return [compile_color(c) for c in colors]
 
 
-def string_to_var_scalar(s, font, f2dot14=False):
-    converter = lambda x: float(x)
-    if f2dot14:
-        converter = lambda x: floatToFixed(float(x), 14)
+def string_to_var_scalar(s, font, f2dot14=False, converter=None):
+    if converter is None:
+        converter = lambda x: float(x)
+        if f2dot14:
+            converter = lambda x: floatToFixed(float(x), 14)
     if not isinstance(s, str):
         s = "ANIM:0=" + str(s)
     v = VariableScalar()
@@ -189,7 +190,9 @@ class PythonBuilder:
     def PaintVarRotate(self, angle, paint):
         base = len(self.deltaset)
 
-        vs = string_to_var_scalar(angle, self.font, f2dot14=True)
+        vs = string_to_var_scalar(
+            angle, self.font, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        )
         angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
 
         return {
@@ -211,7 +214,9 @@ class PythonBuilder:
     def PaintVarRotateAroundCenter(self, angle, center, paint):
         base = len(self.deltaset)
 
-        vs = string_to_var_scalar(angle, self.font, f2dot14=True)
+        vs = string_to_var_scalar(
+            angle, self.font, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        )
         angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(angle_index)
 
