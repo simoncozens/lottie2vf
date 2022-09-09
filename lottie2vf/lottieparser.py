@@ -172,17 +172,26 @@ class LottieParser(restructure.AbstractBuilder):
         if isinstance(
             shape, (objects.Rect, objects.Ellipse, objects.Star, objects.Path)
         ):
-            path = self.to_glyph(shape.to_bezier())
+            path = self.to_glyph(shape.to_bezier(), shape)
             shapegroup.paths.append(path)
         return
 
-    def to_glyph(self, path):
+    def to_glyph(self, path, orig_shape):
         newglyph = "glyph%04i" % (1 + len(self.result["glyphs"]))
         self.result["glyphs"][newglyph] = {"base": bez_to_layer(path, 0)}
         if path.shape.animated:
             self.result["glyphs"][newglyph]["variations"] = {
                 k.time: bez_to_layer(path, k.time) for k in path.shape.keyframes
             }
+            layers = list(self.result["glyphs"][newglyph]["variations"].values())
+            if not all(
+                len(l.shapes[0].nodes) == len(layers[0].shapes[0].nodes)
+                for l in layers[1:]
+            ):
+                logger.warn("Bad bezier conversion")
+                import IPython
+
+                IPython.embed()
         return newglyph
 
     def _on_shape_modifier(self, shape, shapegroup, out_parent):
