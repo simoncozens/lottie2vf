@@ -27,6 +27,8 @@ def string_to_var_scalar(s, font, f2dot14=False):
     v = VariableScalar()
     v.axes = font["fvar"].axes
     for location, value in re.findall(r"ANIM:([\d\.]+)=(\S+)", s):
+        if converter(value) <= -32768 or converter(value) >= 32768:
+            raise ValueError(f"Value too big in '{s}'")
         v.add_value({"ANIM": float(location)}, converter(value))
     if not (("ANIM", 0),) in v.values:
         first = re.match(r"ANIM:[\d\.]+=(\S+)", s)
@@ -94,14 +96,17 @@ class PythonBuilder:
         return {"Format": 10, "Glyph": glyph, "Paint": paint}
 
     def PaintTransform(self, matrix, paint):
-        return { "Format": 12, "Paint": paint, "Transform": {
+        return {
+            "Format": 12,
+            "Paint": paint,
+            "Transform": {
                 "xx": matrix[0],
                 "xy": matrix[1],
                 "yx": matrix[2],
                 "yy": matrix[3],
                 "dx": matrix[4],
                 "dy": matrix[5],
-            }
+            },
         }
 
     def PaintTranslate(self, dx, dy, paint):
@@ -124,7 +129,6 @@ class PythonBuilder:
             "Paint": paint,
             "VarIndexBase": base,
         }
-
 
     def PaintVarScale(self, scale_x, scale_y, paint):
         vs = string_to_var_scalar(scale_x, self.font, f2dot14=True)
@@ -182,6 +186,19 @@ class PythonBuilder:
     def PaintRotate(self, angle, paint):
         return {"Format": 24, "angle": angle, "Paint": paint}
 
+    def PaintVarRotate(self, angle, paint):
+        base = len(self.deltaset)
+
+        vs = string_to_var_scalar(angle, self.font, f2dot14=True)
+        angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
+
+        return {
+            "Format": 25,
+            "angle": fixedToFloat(angle_def, 14),
+            "Paint": paint,
+            "VarIndexBase": base,
+        }
+
     def PaintRotateAroundCenter(self, angle, center, paint):
         return {
             "Format": 26,
@@ -192,9 +209,11 @@ class PythonBuilder:
         }
 
     def PaintVarRotateAroundCenter(self, angle, center, paint):
+        base = len(self.deltaset)
+
         vs = string_to_var_scalar(angle, self.font, f2dot14=True)
         angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
-        base = len(self.deltaset)
+        self.deltaset.append(angle_index)
 
         _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
             self.varstorebuilder
@@ -207,7 +226,7 @@ class PythonBuilder:
 
         return {
             "Format": 27,
-            "angle": angle_def,
+            "angle": fixedToFloat(angle_def, 14),
             "centerX": center[0],
             "centerY": center[1],
             "Paint": paint,
