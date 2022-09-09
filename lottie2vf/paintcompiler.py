@@ -93,6 +93,17 @@ class PythonBuilder:
     def PaintGlyph(self, glyph, paint=None):
         return {"Format": 10, "Glyph": glyph, "Paint": paint}
 
+    def PaintTransform(self, matrix, paint):
+        return { "Format": 12, "Paint": paint, "Transform": {
+                "xx": matrix[0],
+                "xy": matrix[1],
+                "yx": matrix[2],
+                "yy": matrix[3],
+                "dx": matrix[4],
+                "dy": matrix[5],
+            }
+        }
+
     def PaintTranslate(self, dx, dy, paint):
         return {"Format": 14, "dx": dx, "dy": dy, "Paint": paint}
 
@@ -178,6 +189,29 @@ class PythonBuilder:
             "centerX": center[0],
             "centerY": center[1],
             "Paint": paint,
+        }
+
+    def PaintVarRotateAroundCenter(self, angle, center, paint):
+        vs = string_to_var_scalar(angle, self.font, f2dot14=True)
+        angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
+        base = len(self.deltaset)
+
+        _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+            self.varstorebuilder
+        )
+        _, cy_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+            self.varstorebuilder
+        )
+        self.deltaset.append(cx_ix)
+        self.deltaset.append(cy_ix)
+
+        return {
+            "Format": 27,
+            "angle": angle_def,
+            "centerX": center[0],
+            "centerY": center[1],
+            "Paint": paint,
+            "VarIndexBase": base,
         }
 
     def ColorLine(self, start_or_stops, end=None, extend="pad"):
