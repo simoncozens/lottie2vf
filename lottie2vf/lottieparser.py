@@ -124,13 +124,13 @@ def fill_to_paint(fill):
         return
     if isinstance(fill, objects.GradientFill):
         return gradient_fill_to_paint(fill)
-    if color.animated:
+    if fill.color.animated:
         logger.warning(f"Animated colour not supported")
-        color = color.get_value(0)
+        color = fill.color.get_value(0)
     else:
-        color = color.value
+        color = fill.color.value
 
-    color_string = color_to_string(fill.color)
+    color_string = color_to_string(color)
 
     if fill.opacity.animated:
         raise NotImplementedError
