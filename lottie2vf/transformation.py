@@ -104,14 +104,14 @@ def rotation_to_paint(transform, paint, animation):
             raise NotImplementedError
         rotation = rotation.clone()
         for k in rotation.keyframes:
-            k.start /= math.pi
+            k.start.components[0] = math.radians(-k.start.components[0]) / math.pi
         animated_rotation = animated_value_to_ot(rotation.keyframes, animation)
         if has_anchor:
             return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
         else:
             return f"PaintVarRotate( {animated_rotation[0]}, {paint})"
 
-    angle = math.radians(rotation.value) / math.pi
+    angle = math.radians(-rotation.value) / math.pi
     if has_anchor:
         return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x}, {anchor.value.y}), {paint})"
     else:
