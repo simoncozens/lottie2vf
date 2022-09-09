@@ -85,7 +85,7 @@ def scale_to_paint(transform, paint, animation):
         return f"PaintVarScale( {animated_scale[0]}, {animated_scale[1]}, {paint})"
 
 
-def rotation_to_paint(transform, paint):
+def rotation_to_paint(transform, paint, animation):
     rotation = transform.rotation
     anchor = transform.anchor_point
     has_anchor = anchor and (
@@ -97,12 +97,21 @@ def rotation_to_paint(transform, paint):
         return paint
 
     if animated:
-        logger.warn("Animated rotation not implemented")
-        rotation.value = rotation.get_value(0)
+        if anchor.animated:
+            logger.warn("Animated rotation not implemented")
+            raise NotImplementedError
+        rotation = rotation.clone()
+        for k in rotation.keyframes:
+            k.start /= math.pi
+        animated_rotation = animated_value_to_ot(rotation.keyframes, animation)
+        if has_anchor:
+            return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
+        else:
+            return f"PaintVarRotate( {animated_rotation[0]}, {paint})"
 
     angle = math.radians(rotation.value) / math.pi
     if has_anchor:
-        return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x / 100}, {anchor.value.y / 100}), {paint})"
+        return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x}, {anchor.value.y}), {paint})"
     else:
         return f"PaintRotate( {angle}, {paint})"
 
@@ -136,8 +145,10 @@ def apply_transform_to_paint(transform, paint, animation):
     # if not frames:
     #     return matrix_to_paint(transform.to_matrix(0), paint)
 
-    return position_to_paint(
+    return scale_to_paint(
         transform,
-        rotation_to_paint(transform, scale_to_paint(transform, paint, animation)),
+        rotation_to_paint(
+            transform, position_to_paint(transform, paint, animation), animation
+        ),
         animation,
     )
