@@ -213,10 +213,15 @@ class LottieParser(restructure.AbstractBuilder):
 
     @property
     def paint(self):
-        if len(self.result["paints"]) == 1:
-            return self.result["paints"][0]
+        def upside_down(p):
+            return f"PaintTransform( (1, 0, 0, -1, 0, {self.animation.height}), {p})"
 
-        return "PaintColrLayers([" + ", ".join(self.result["paints"]) + "])"
+        if len(self.result["paints"]) == 1:
+            return upside_down(self.result["paints"][0])
+
+        return upside_down(
+            "PaintColrLayers([" + ", ".join(self.result["paints"]) + "])"
+        )
 
     @property
     def glyphs(self):
