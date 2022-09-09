@@ -150,10 +150,13 @@ def apply_transform_to_paint(transform, paint, animation):
     if not frames:
         return matrix_to_paint(transform.to_matrix(0), paint)
 
-    return scale_to_paint(
+    return position_to_paint(
         transform,
-        rotation_to_paint(
-            transform, position_to_paint(transform, paint, animation), animation
+        scale_to_paint(transform,
+            rotation_to_paint(
+                transform, paint, animation
+            ),
+            animation
         ),
         animation,
     )
