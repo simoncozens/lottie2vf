@@ -7,112 +7,11 @@ import logging
 from babelfont import Layer
 import math
 
+from .transformation import apply_transform_to_paint
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["LottieParser", "load_animation"]
-
-
-def animated_value_to_ot(keyframes):
-    values = [""] * len(keyframes[0].start.components)
-    for ix in range(len(values)):
-        if all(
-            [
-                keyframes[0].start.components[ix] == k.start.components[ix]
-                for k in keyframes
-                if k.start
-            ]
-        ):
-            # This isn't animated
-            values[ix] = keyframes[0].start.components[ix]
-        else:
-            for k in keyframes:
-                if not k.start:
-                    continue
-                v = k.start.components[ix]
-                values[ix] += f"ANIM:{k.time}={v} "
-            values[ix] = f'"{values[ix]}"'
-    return values
-
-
-def scale_to_paint(transform, paint):
-    scale = transform.scale
-    anchor = transform.anchor_point
-    has_anchor = anchor and (
-        anchor.animated or any(x != 0 for x in anchor.value.components)
-    )
-    animated = scale.animated or (anchor and anchor.animated)
-
-    if not animated and all(x == 100 for x in scale.value.components):
-        return paint
-
-    if not animated:
-        # Scale down the scale
-        scale = scale.clone()
-        scale.value /= 100
-        if has_anchor:
-            return f"PaintScaleAroundCenter( {scale.value.x}, {scale.value.y}, ({anchor.value.x}, {anchor.value.y}), {paint})"
-        else:
-            return f"PaintScale( {scale.value.x}, {scale.value.y}, {paint})"
-
-    # Scale down the scale
-    scale = scale.clone()
-    for k in scale.keyframes:
-        k.start /= 100
-
-    animated_scale = animated_value_to_ot(scale.keyframes)
-    if anchor.animated:
-        raise NotImplementedError
-
-    if has_anchor:
-        return f"PaintVarScaleAroundCenter( {animated_scale[0]}, {animated_scale[1]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
-    else:
-        return f"PaintVarScale( {animated_scale[0]}, {animated_scale[1]}, {paint})"
-
-
-def rotation_to_paint(transform, paint):
-    rotation = transform.rotation
-    anchor = transform.anchor_point
-    has_anchor = anchor and (
-        anchor.animated or any(x != 0 for x in anchor.value.components)
-    )
-    animated = rotation.animated or (anchor and anchor.animated)
-
-    if not animated and rotation.value == 0.0:
-        return paint
-
-    if animated:
-        raise NotImplementedError
-
-    angle = math.radians(rotation.value) / math.pi
-    if has_anchor:
-        return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x / 100}, {anchor.value.y / 100}), {paint})"
-    else:
-        return f"PaintRotate( {angle}, {paint})"
-
-
-def position_to_paint(transform, paint, animation):
-    position = transform.position
-    animated = position.animated
-
-    if not animated and all(x == 0 for x in position.value.components):
-        return paint
-
-    if not animated:
-        return f"PaintTranslate( {position.value.x}, {position.value.y}, {paint})"
-
-    animated_pos = animated_value_to_ot(position.keyframes)
-    return f"PaintVarTranslate( {animated_pos[0]}, {animated_pos[1]}, {paint})"
-
-
-def apply_transform_to_paint(transform, paint, animation):
-    if not transform:
-        return paint
-    return position_to_paint(
-        transform,
-        rotation_to_paint(transform, scale_to_paint(transform, paint)),
-        animation,
-    )
 
 
 def color_to_string(color):
@@ -143,10 +42,10 @@ def fill_to_paint(fill):
 
 def gradient_fill_to_paint(fill):
     if fill.gradient_type != objects.shapes.GradientType.Linear:
-        return NotImplementedError
+        pass  # raise NotImplementedError
     line = {stop: color_to_string(col) for stop, col in fill.colors.get_stops(None)}
     if fill.start_point.animated or fill.end_point.animated:
-        return NotImplementedError
+        raise NotImplementedError
     start_x, start_y = fill.start_point.get_value(0).components[:2]
     end_x, end_y = fill.end_point.get_value(0).components[:2]
     angle = (fill.start_point.value - fill.end_point.value).polar_angle + math.pi / 2
@@ -222,7 +121,7 @@ class LottieParser(restructure.AbstractBuilder):
             # print("  is precomp ", lot.reference_id)
             for layer in self._precomps.get(lot.reference_id, []):
                 # print("  Processing layer", layer)
-                self.process_layer(layer, [])
+                self.process_layer(layer, dom_parent)
         return dom_parent
 
     def _on_masks(self, masks):
