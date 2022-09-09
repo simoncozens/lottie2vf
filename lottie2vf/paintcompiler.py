@@ -114,6 +114,23 @@ class PythonBuilder:
             "VarIndexBase": base,
         }
 
+
+    def PaintVarScale(self, scale_x, scale_y, paint):
+        vs = string_to_var_scalar(scale_x, self.font, f2dot14=True)
+        x_def, x_index = vs.add_to_variation_store(self.varstorebuilder)
+        base = len(self.deltaset)
+        self.deltaset.append(x_index)
+        vs = string_to_var_scalar(scale_y, self.font, f2dot14=True)
+        y_def, y_index = vs.add_to_variation_store(self.varstorebuilder)
+        self.deltaset.append(y_index)
+        return {
+            "Format": 17,
+            "scaleX": fixedToFloat(x_def, 14),
+            "scaleY": fixedToFloat(y_def, 14),
+            "Paint": paint,
+            "VarIndexBase": base,
+        }
+
     def PaintScaleAroundCenter(self, scale_x, scale_y, center, paint):
         return {
             "Format": 18,
