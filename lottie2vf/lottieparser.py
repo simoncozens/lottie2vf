@@ -115,8 +115,7 @@ class LottieParser(restructure.AbstractBuilder):
         # print("Visiting layer", lot)
         if lot.masks:
             self._on_masks(lot.masks)
-        if lot.transform:
-            dom_parent["layer_transform"] = lot.transform
+        dom_parent["layer_transform"] = lot.transform
         if isinstance(lot, objects.PreCompLayer):
             # print("  is precomp ", lot.reference_id)
             for layer in self._precomps.get(lot.reference_id, []):
@@ -132,10 +131,8 @@ class LottieParser(restructure.AbstractBuilder):
         # print("Visiting font")
         pass
 
-    def _on_layer_end(self, out_layer):
-        # print("End of layer")
-        # print(self.result["paints"])
-        pass
+    def _on_layer_end(self, dom_parent):
+        dom_parent["layer_transform"] = None
 
     def _on_asset(self, asset):
         # print("Visiting asset", asset)
@@ -150,14 +147,14 @@ class LottieParser(restructure.AbstractBuilder):
             return
         # Check fill, lottie.transform, layer transform
         res = apply_transform_to_paint(
-            dom_parent["layer_transform"],
-            apply_transform_to_paint(
-                group.lottie.transform,
-                paint_all_shapes(group.paths, fill_to_paint(group.fill)),
-                self.animation,
-            ),
+            group.lottie.transform,
+            paint_all_shapes(group.paths, fill_to_paint(group.fill)),
             self.animation,
         )
+        if dom_parent["layer_transform"]:
+            res = apply_transform_to_paint(
+                dom_parent["layer_transform"], res, self.animation
+            )
         dom_parent["paints"].append(res)
         return res
 
