@@ -130,6 +130,22 @@ def position_to_paint(transform, paint, animation):
     return f"PaintVarTranslate( {animated_pos[0]}, {animated_pos[1]}, {paint})"
 
 
+def anchor_to_paint(transform, paint, animation):
+    anchor = transform.anchor_point
+    print(anchor)
+    animated = anchor.animated
+
+    if not animated and all(x == 0 for x in anchor.value.components):
+        return paint
+
+    if not animated:
+        return f"PaintTranslate( {-anchor.value.x}, {-anchor.value.y}, {paint})"
+
+    anchor = anchor.clone()
+    raise NotImplementedError
+    animated_pos = animated_value_to_ot(anchor.keyframes, animation)
+    return f"PaintVarTranslate( {animated_pos[0]}, {animated_pos[1]}, {paint})"
+
 def matrix_to_paint(matrix, paint):
     if matrix.to_css_2d() == TransformMatrix().to_css_2d():
         return paint
@@ -141,18 +157,23 @@ def matrix_to_paint(matrix, paint):
 
 def apply_transform_to_paint(transform, paint, animation):
     frames = (
-        (transform.scale.keyframes or [])
+        (transform.scale and transform.scale.keyframes or [])
         + (transform.position.keyframes or [])
-        + (transform.rotation.keyframes or [])
+        + (transform.rotation and transform.rotation.keyframes or [])
     )
     if not frames:
         return matrix_to_paint(transform.to_matrix(0), paint)
+    matrices = {k.time: transform.to_matrix(k.time) for k in frames}
 
     return position_to_paint(
         transform,
         scale_to_paint(transform,
             rotation_to_paint(
-                transform, paint, animation
+                transform,
+                    anchor_to_paint(
+                        transform, paint, animation
+                    ),
+                animation
             ),
             animation
         ),
