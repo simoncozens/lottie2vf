@@ -117,18 +117,27 @@ class PythonBuilder:
         base = len(self.deltaset)
 
         vs = string_to_var_scalar(dx, self.font, f2dot14=False)
-        dx_def, dx_index = vs.add_to_variation_store(self.varstorebuilder)
-        self.deltaset.append(dx_index)
+        dx_default, dx_index = vs.add_to_variation_store(self.varstorebuilder)
         vs = string_to_var_scalar(dy, self.font, f2dot14=False)
-        dy_def, dy_index = vs.add_to_variation_store(self.varstorebuilder)
+        dy_default, dy_index = vs.add_to_variation_store(self.varstorebuilder)
+
+        self.deltaset.append(dx_index)
         self.deltaset.append(dy_index)
 
         return {
             "Format": 15,
-            "dx": dx_def,
-            "dy": dy_def,
+            "dx": dx_default,
+            "dy": dy_default,
             "Paint": paint,
             "VarIndexBase": base,
+        }
+
+    def PaintScale(self, scale_x, scale_y, paint):
+        return {
+            "Format": 16,
+            "scaleX": scale_x,
+            "scaleY": scale_y,
+            "Paint": paint,
         }
 
     def PaintVarScale(self, scale_x, scale_y, paint):
@@ -197,7 +206,7 @@ class PythonBuilder:
 
         return {
             "Format": 25,
-            "angle": fixedToFloat(angle_def, 14),
+            "angle": fixedToFloat(angle_def, 14) * 180,
             "Paint": paint,
             "VarIndexBase": base,
         }
@@ -231,7 +240,7 @@ class PythonBuilder:
 
         return {
             "Format": 27,
-            "angle": fixedToFloat(angle_def, 14),
+            "angle": fixedToFloat(angle_def, 14) * 180,
             "centerX": center[0],
             "centerY": center[1],
             "Paint": paint,
