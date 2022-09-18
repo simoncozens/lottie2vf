@@ -1,7 +1,6 @@
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-from fontTools.ttLib.ttGlyphSet import _TTGlyphSetGlyf
 from fontTools.misc.timeTools import epoch_diff, timestampSinceEpoch
 from cu2qu.ufo import glyphs_to_quadratic
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
@@ -33,7 +32,7 @@ def add_glyphs(fb, glyphs):
     glyf = {}
     fb.setupGlyphOrder([".notdef", "baseglyph"] + list(glyphs.keys()))
 
-    fb.setupHorizontalMetrics({g: (fb._an.width, 0) for g in fb.font.getGlyphOrder()})
+    # This zero is clearly wrong
 
     glyphset = {}
 
@@ -43,6 +42,7 @@ def add_glyphs(fb, glyphs):
     glyphset["baseglyph"] = pen.glyph()
     variations = {}
 
+    metrics = {".notdef": (0, fb._an.width), "baseglyph": (0, fb._an.width)}
     for glyphname, glyph in glyphs.items():
         if glyph.get("variations"):
             keyframes = list(sorted(glyph["variations"].keys()))
@@ -67,6 +67,9 @@ def add_glyphs(fb, glyphs):
         glyph["base"].draw(pen)
         glyphset[glyphname] = pen.glyph()
 
+        metrics[glyphname] = (fb._an.width, glyph["base"].lsb)
+
+    fb.setupHorizontalMetrics(metrics)
     fb.setupGlyf(glyphset)
     if variations:
         fb.setupGvar(variations)
