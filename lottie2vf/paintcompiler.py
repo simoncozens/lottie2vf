@@ -83,6 +83,18 @@ class PythonBuilder:
             "Alpha": alpha,
         }
 
+    def PaintVarSolid(self, col_or_colrs, alpha):
+        base = len(self.deltaset)
+        vs = string_to_var_scalar(alpha, self.font, f2dot14=True)
+        alpha_def, alpha_index = vs.add_to_variation_store(self.varstorebuilder)
+        self.deltaset.append(alpha_index)
+        return {
+            "Format": 3,
+            "PaletteIndex": self.get_palette_index(col_or_colrs),
+            "Alpha": fixedToFloat(alpha_def, 14),
+            "VarIndexBase": base,
+        }
+
     def PaintSweepGradient(self, pt, startAngle, endAngle, colorline):
         return {
             "Format": 8,

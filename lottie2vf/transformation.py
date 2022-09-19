@@ -42,7 +42,10 @@ def scale_to_paint(transform, paint, animation):
     has_anchor = anchor and (
         anchor.animated or any(x != 0 for x in anchor.value.components)
     )
+    if not scale:
+        return paint
     animated = scale.animated or (anchor and anchor.animated)
+    has_anchor = False # XXX
 
     if not animated and all(x == 100 for x in scale.value.components):
         return paint
@@ -65,6 +68,8 @@ def scale_to_paint(transform, paint, animation):
     # Scale down the scale
     scale = scale.clone()
     for k in scale.keyframes:
+        if not k.start:
+            continue
         k.start /= 100
         if k.start.x >= 2:
             logger.warn(
@@ -94,6 +99,7 @@ def rotation_to_paint(transform, paint, animation):
         anchor.animated or any(x != 0 for x in anchor.value.components)
     )
     animated = rotation.animated or (anchor and anchor.animated)
+    has_anchor = False # XXX
 
     if not animated and rotation.value == 0.0:
         return paint
@@ -107,13 +113,13 @@ def rotation_to_paint(transform, paint, animation):
         if has_anchor:
             return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
         else:
-            return f"PaintVarRotate( {animated_rotation[0]}, {paint})"
+            return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, (0,0), {paint})"
 
     angle = rotation.value
     if has_anchor:
         return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x}, {anchor.value.y}), {paint})"
     else:
-        return f"PaintRotate( {angle}, {paint})"
+        return f"PaintRotateAroundCenter( {angle}, (0,0), {paint})"
 
 
 def position_to_paint(transform, paint, animation):
@@ -132,7 +138,6 @@ def position_to_paint(transform, paint, animation):
 
 def anchor_to_paint(transform, paint, animation):
     anchor = transform.anchor_point
-    print(anchor)
     animated = anchor.animated
 
     if not animated and all(x == 0 for x in anchor.value.components):
@@ -167,8 +172,8 @@ def apply_transform_to_paint(transform, paint, animation):
 
     return position_to_paint(
         transform,
-        scale_to_paint(transform,
-            rotation_to_paint(
+        rotation_to_paint(transform,
+            scale_to_paint(
                 transform,
                     anchor_to_paint(
                         transform, paint, animation

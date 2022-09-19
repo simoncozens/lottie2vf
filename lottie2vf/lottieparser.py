@@ -7,7 +7,7 @@ import logging
 from babelfont import Layer
 import math
 
-from .transformation import apply_transform_to_paint
+from .transformation import apply_transform_to_paint, animated_value_to_ot
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,11 @@ def color_to_string(color):
     return "#%02X%02X%02X%02X" % tuple([int(x * 255) for x in color.components])
 
 
-def fill_to_paint(fill):
+def fill_to_paint(fill, opacity, animation):
     if not fill:
         return
     if isinstance(fill, objects.GradientFill):
-        return gradient_fill_to_paint(fill)
+        return gradient_fill_to_paint(fill, opacity, animation)
     if fill.color.animated:
         logger.warning(f"Animated colour not supported")
         color = fill.color.get_value(0)
@@ -31,16 +31,36 @@ def fill_to_paint(fill):
 
     color_string = color_to_string(color)
 
-    if fill.opacity.animated:
+    if fill.opacity.animated and opacity.animated:
         raise NotImplementedError
-    alpha = ""
-    if fill.opacity.value != 100:
-        alpha = f", alpha={fill.opacity.value/100}"
+    if opacity.animated:
+        opacity = opacity.clone()
+        for k in opacity.keyframes:
+            if not k.start:
+                continue
+            k.start /= 100
+            k. start *= fill.opacity.value / 100
+        alpha = animated_value_to_ot(opacity.keyframes, animation)
+        return f"PaintVarSolid( '{color_string}', {alpha[0]} )"
+    elif fill.opacity.animated:
+        opacity = fill.opacity.clone()
+        for k in opacity.keyframes:
+            if not k.start:
+                continue
+            k.start /= 100
+            k. start *= opacity.value / 100
+        alpha = animated_value_to_ot(opacity.keyframes, animation)
 
-    return f"PaintSolid( '{color_string}'{alpha} )"
+        return f"PaintVarSolid( '{color_string}', {alpha[0]} )"
+    else:
+        opacity = fill.opacity.value / 100 * opacity.value / 100
+        alpha = ""
+        if opacity != 1.0:
+            alpha = f", alpha={opacity}"
+        return f"PaintSolid( '{color_string}'{alpha} )"
 
 
-def gradient_fill_to_paint(fill):
+def gradient_fill_to_paint(fill, opacity, animation):
     if fill.gradient_type != objects.shapes.GradientType.Linear:
         pass  # raise NotImplementedError
     line = {stop: color_to_string(col) for stop, col in fill.colors.get_stops(None)}
@@ -148,7 +168,7 @@ class LottieParser(restructure.AbstractBuilder):
         # Check fill, lottie.transform, layer transform
         res = apply_transform_to_paint(
             group.lottie.transform,
-            paint_all_shapes(group.paths, fill_to_paint(group.fill)),
+            paint_all_shapes(group.paths, fill_to_paint(group.fill, group.lottie.transform.opacity, self.animation)),
             self.animation,
         )
         if dom_parent["layer_transform"]:
@@ -212,6 +232,8 @@ class LottieParser(restructure.AbstractBuilder):
     def paint(self):
         def upside_down(p):
             return f"PaintTransform( (1, 0, 0, -1, 0, {self.animation.height}), {p})"
+        # def upside_down(p):
+        #     return p
 
         if len(self.result["paints"]) == 1:
             return upside_down(self.result["paints"][0])
