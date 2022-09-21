@@ -1,0 +1,3 @@
+lottie
+fontTools
+cu2qu
