@@ -38,14 +38,9 @@ def animated_value_to_ot(keyframes, animation):
 
 def scale_to_paint(transform, paint, animation):
     scale = transform.scale
-    anchor = transform.anchor_point
-    has_anchor = anchor and (
-        anchor.animated or any(x != 0 for x in anchor.value.components)
-    )
     if not scale:
         return paint
-    animated = scale.animated or (anchor and anchor.animated)
-    has_anchor = False # XXX
+    animated = scale.animated
 
     if not animated and all(x == 100 for x in scale.value.components):
         return paint
@@ -60,10 +55,7 @@ def scale_to_paint(transform, paint, animation):
             )
             scale.value.x = 1.99
 
-        if has_anchor:
-            return f"PaintScaleAroundCenter( {scale.value.x}, {scale.value.y}, ({anchor.value.x}, {anchor.value.y}), {paint})"
-        else:
-            return f"PaintScale( {scale.value.x}, {scale.value.y}, {paint})"
+        return f"PaintScale( {scale.value.x}, {scale.value.y}, {paint})"
 
     # Scale down the scale
     scale = scale.clone()
@@ -83,13 +75,7 @@ def scale_to_paint(transform, paint, animation):
             k.start.y = 1.99
 
     animated_scale = animated_value_to_ot(scale.keyframes, animation)
-    if anchor.animated:
-        raise NotImplementedError
-
-    if has_anchor:
-        return f"PaintVarScaleAroundCenter( {animated_scale[0]}, {animated_scale[1]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
-    else:
-        return f"PaintVarScale( {animated_scale[0]}, {animated_scale[1]}, {paint})"
+    return f"PaintVarScale( {animated_scale[0]}, {animated_scale[1]}, {paint})"
 
 
 def rotation_to_paint(transform, paint, animation):
@@ -105,21 +91,12 @@ def rotation_to_paint(transform, paint, animation):
         return paint
 
     if animated:
-        if anchor.animated:
-            logger.warn("Animated rotation not implemented")
-            raise NotImplementedError
         rotation = rotation.clone()
         animated_rotation = animated_value_to_ot(rotation.keyframes, animation)
-        if has_anchor:
-            return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, ({anchor.value.x}, {anchor.value.y }), {paint})"
-        else:
-            return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, (0,0), {paint})"
+        return f"PaintVarRotateAroundCenter( {animated_rotation[0]}, (0,0), {paint})"
 
     angle = rotation.value
-    if has_anchor:
-        return f"PaintRotateAroundCenter( {angle}, ({anchor.value.x}, {anchor.value.y}), {paint})"
-    else:
-        return f"PaintRotateAroundCenter( {angle}, (0,0), {paint})"
+    return f"PaintRotateAroundCenter( {angle}, (0,0), {paint})"
 
 
 def position_to_paint(transform, paint, animation):
@@ -147,7 +124,8 @@ def anchor_to_paint(transform, paint, animation):
         return f"PaintTranslate( {-anchor.value.x}, {-anchor.value.y}, {paint})"
 
     anchor = anchor.clone()
-    raise NotImplementedError
+    for k in anchor.keyframes:
+        k.start *= -1
     animated_pos = animated_value_to_ot(anchor.keyframes, animation)
     return f"PaintVarTranslate( {animated_pos[0]}, {animated_pos[1]}, {paint})"
 
