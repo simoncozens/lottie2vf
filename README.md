@@ -3,8 +3,8 @@
 This is a simple `.lottie` to animated variable font convertor.
 It's a work in progress; it may or may not support your Lottie file, but it'll do its best:
 
-  pip3 install -r requirements.txt
-  python3 -m lottie2vf file.lottie
+    pip3 install -r requirements.txt
+    python3 -m lottie2vf file.lottie
 
 ## What should work
 
