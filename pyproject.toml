@@ -7,6 +7,6 @@ authors = [
 ]
 dependencies = [
     "fontTools>=4.37.3",
-    "python-lottie",
+    "lottie",
     "babelfont@git+https://github.com/simoncozens/babelfont@nfsf"
 ]
