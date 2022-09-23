@@ -18,41 +18,49 @@ def compile_colors(colors):
     return [compile_color(c) for c in colors]
 
 
-def string_to_var_scalar(s, font, f2dot14=False, converter=None):
-    if converter is None:
-        converter = lambda x: float(x)
-        if f2dot14:
-            converter = lambda x: floatToFixed(float(x), 14)
-    if not isinstance(s, str):
-        s = "ANIM:0=" + str(s)
-    v = VariableScalar()
-    v.axes = font["fvar"].axes
-    for location, value in re.findall(r"ANIM:([\d\.]+)=(\S+)", s):
-        if converter(value) <= -32768 or converter(value) >= 32768:
-            raise ValueError(f"Value too big in '{s}'")
-        v.add_value({"ANIM": float(location)}, converter(value))
-    if not (("ANIM", 0),) in v.values:
-        first = re.match(r"ANIM:[\d\.]+=(\S+)", s)
-        v.add_value({"ANIM": 0}, converter(first[1]))
-    return v
-
-
-def devariablize(val):
-    if not isinstance(val, str):
-        return val
-    m = re.match(r"ANIM:[\d\.]+=(\S+)", val)
-    if not m:
-        raise ValueError(f"Bad variable value {val}")
-    return float(m[1])
-
-
 class PythonBuilder:
     def __init__(self, font) -> None:
         self.font = font
         self.palette = []
         self.variations = []
         self.deltaset = []
-        self.varstorebuilder = OnlineVarStoreBuilder(["ANIM"])
+        assert "fvar" in font, "Font needs an fvar table"
+        self.axes = font["fvar"].axes
+        axis_tags = [x.axisTag for x in self.axes]
+        self.varstorebuilder = OnlineVarStoreBuilder(axis_tags)
+
+    def string_to_var_scalar(self, s, f2dot14=False, converter=None):
+        if converter is None:
+            converter = lambda x: float(x)
+            if f2dot14:
+                converter = lambda x: floatToFixed(float(x), 14)
+        v = VariableScalar()
+        v.axes = self.axes
+        default_location = {axis.axisTag: axis.defaultValue for axis in self.axes}
+        if not isinstance(s, str):
+            v.add_value(default_location, converter(float(s)))
+            return v
+
+        first_value = None
+
+        for values in s.split():
+            locations, value = values.split("=")
+            if converter(value) <= -32768 or converter(value) >= 32768:
+                raise ValueError(f"Value too big in '{s}'")
+            location = {}
+            for loc in locations.split(","):
+                axis, axis_loc = loc.split(":")
+                location[axis] = float(axis_loc)
+            v.add_value(location, converter(value))
+
+            if first_value is None:
+                first_value = value
+
+        if not tuple(default_location.items()) in v.values:
+            if first_value is None:
+                raise ValueError(f"No default value OR first value in '{s}'")
+            v.add_value(default_location, converter(first_value))
+        return v
 
     def get_palette_index(self, color):
         if not isinstance(color, list):
@@ -85,7 +93,7 @@ class PythonBuilder:
 
     def PaintVarSolid(self, col_or_colrs, alpha):
         base = len(self.deltaset)
-        vs = string_to_var_scalar(alpha, self.font, f2dot14=True)
+        vs = self.string_to_var_scalar(alpha, f2dot14=True)
         alpha_def, alpha_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(alpha_index)
         return {
@@ -128,9 +136,9 @@ class PythonBuilder:
     def PaintVarTranslate(self, dx, dy, paint):
         base = len(self.deltaset)
 
-        vs = string_to_var_scalar(dx, self.font, f2dot14=False)
+        vs = self.string_to_var_scalar(dx, f2dot14=False)
         dx_default, dx_index = vs.add_to_variation_store(self.varstorebuilder)
-        vs = string_to_var_scalar(dy, self.font, f2dot14=False)
+        vs = self.string_to_var_scalar(dy, f2dot14=False)
         dy_default, dy_index = vs.add_to_variation_store(self.varstorebuilder)
 
         self.deltaset.append(dx_index)
@@ -153,11 +161,11 @@ class PythonBuilder:
         }
 
     def PaintVarScale(self, scale_x, scale_y, paint):
-        vs = string_to_var_scalar(scale_x, self.font, f2dot14=True)
+        vs = self.string_to_var_scalar(scale_x, f2dot14=True)
         x_def, x_index = vs.add_to_variation_store(self.varstorebuilder)
         base = len(self.deltaset)
         self.deltaset.append(x_index)
-        vs = string_to_var_scalar(scale_y, self.font, f2dot14=True)
+        vs = self.string_to_var_scalar(scale_y, f2dot14=True)
         y_def, y_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(y_index)
         return {
@@ -179,17 +187,17 @@ class PythonBuilder:
         }
 
     def PaintVarScaleAroundCenter(self, scale_x, scale_y, center, paint):
-        vs = string_to_var_scalar(scale_x, self.font, f2dot14=True)
+        vs = self.string_to_var_scalar(scale_x, f2dot14=True)
         x_def, x_index = vs.add_to_variation_store(self.varstorebuilder)
         base = len(self.deltaset)
         self.deltaset.append(x_index)
-        vs = string_to_var_scalar(scale_y, self.font, f2dot14=True)
+        vs = self.string_to_var_scalar(scale_y, f2dot14=True)
         y_def, y_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(y_index)
-        _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+        _, cx_ix = self.string_to_var_scalar(0).add_to_variation_store(
             self.varstorebuilder
         )
-        _, cy_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+        _, cy_ix = self.string_to_var_scalar(0).add_to_variation_store(
             self.varstorebuilder
         )
         self.deltaset.append(cx_ix)
@@ -211,8 +219,8 @@ class PythonBuilder:
     def PaintVarRotate(self, angle, paint):
         base = len(self.deltaset)
 
-        vs = string_to_var_scalar(
-            angle, self.font, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        vs = self.string_to_var_scalar(
+            angle, converter=lambda x: floatToFixed(float(x) / 180, 14)
         )
         angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
 
@@ -235,16 +243,16 @@ class PythonBuilder:
     def PaintVarRotateAroundCenter(self, angle, center, paint):
         base = len(self.deltaset)
 
-        vs = string_to_var_scalar(
-            angle, self.font, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        vs = self.string_to_var_scalar(
+            angle, converter=lambda x: floatToFixed(float(x) / 180, 14)
         )
         angle_def, angle_index = vs.add_to_variation_store(self.varstorebuilder)
         self.deltaset.append(angle_index)
 
-        _, cx_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+        _, cx_ix = self.string_to_var_scalar(0).add_to_variation_store(
             self.varstorebuilder
         )
-        _, cy_ix = string_to_var_scalar(0, self.font).add_to_variation_store(
+        _, cy_ix = self.string_to_var_scalar(0).add_to_variation_store(
             self.varstorebuilder
         )
         self.deltaset.append(cx_ix)
