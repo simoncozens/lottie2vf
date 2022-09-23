@@ -44,12 +44,12 @@ class PythonBuilder:
         first_value = None
 
         for values in s.split():
-            locations, value = values.split("=")
+            locations, value = values.split(":")
             if converter(value) <= -32768 or converter(value) >= 32768:
                 raise ValueError(f"Value too big in '{s}'")
             location = {}
             for loc in locations.split(","):
-                axis, axis_loc = loc.split(":")
+                axis, axis_loc = loc.split("=")
                 location[axis] = float(axis_loc)
             v.add_value(location, converter(value))
 

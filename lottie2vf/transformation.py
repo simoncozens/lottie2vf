@@ -31,7 +31,7 @@ def animated_value_to_ot(keyframes, animation):
                 if k.time in seen:
                     continue
                 seen.add(k.time)
-                values[ix] += f"ANIM:{k.time}={v} "
+                values[ix] += f"ANIM={k.time}:{v} "
             values[ix] = f'"{values[ix]}"'
     return values
 
