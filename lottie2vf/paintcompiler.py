@@ -347,7 +347,7 @@ def compile_paints(font, python_code):
     methods = [
         x for x in dir(builder) if x.startswith("Paint") or x.startswith("ColorLine")
     ]
-    this_locals = {"glyphs": {}}
+    this_locals = {"glyphs": {}, "font": font}
     for method in methods:
         this_locals[method] = getattr(builder, method)
     exec(python_code, this_locals, this_locals)
