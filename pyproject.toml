@@ -1,0 +1,12 @@
+[project]
+name = "lottie2vf"
+description = "Converts lottie files to variable fonts"
+version = "0.1.0"
+authors = [
+    { name = "Simon Cozens", email = "simon@simon-cozens.org" }
+]
+dependencies = [
+    "fontTools>=4.37.3",
+    "python-lottie",
+    "git+https://github.com/simoncozens/babelfont@nfsf"
+]
