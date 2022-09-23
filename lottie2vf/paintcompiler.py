@@ -267,6 +267,48 @@ class PythonBuilder:
             "VarIndexBase": base,
         }
 
+    def PaintVarSkewAroundCenter(self, angle_x, angle_y, center, paint):
+        base = len(self.deltaset)
+
+        vs = self.string_to_var_scalar(
+            angle_x, f2dot14=True, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        )
+        angle_x_def, angle_x_index = vs.add_to_variation_store(self.varstorebuilder)
+        self.deltaset.append(angle_x_index)
+
+        vs = self.string_to_var_scalar(
+            angle_y, f2dot14=True, converter=lambda x: floatToFixed(float(x) / 180, 14)
+        )
+        angle_y_def, angle_y_index = vs.add_to_variation_store(self.varstorebuilder)
+        self.deltaset.append(angle_y_index)
+
+        _, cx_ix = self.string_to_var_scalar(0).add_to_variation_store(
+            self.varstorebuilder
+        )
+        _, cy_ix = self.string_to_var_scalar(0).add_to_variation_store(
+            self.varstorebuilder
+        )
+        self.deltaset.append(cx_ix)
+        self.deltaset.append(cy_ix)
+
+        return {
+            "Format": 31,
+            "xSkewAngle": fixedToFloat(angle_x_def, 14) * 180,
+            "ySkewAngle": fixedToFloat(angle_y_def, 14) * 180,
+            "centerX": center[0],
+            "centerY": center[1],
+            "Paint": paint,
+            "VarIndexBase": base,
+        }
+
+    def PaintComposite(self, mode, src, dst):
+        return {
+            "Format": 32,
+            "CompositeMode": mode,
+            "SourcePaint": src,
+            "BackdropPaint": dst,
+        }
+
     def ColorLine(self, start_or_stops, end=None, extend="pad"):
         if end is None:
             stops = start_or_stops
@@ -308,7 +350,7 @@ def compile_paints(font, python_code):
     this_locals = {"glyphs": {}}
     for method in methods:
         this_locals[method] = getattr(builder, method)
-    exec(python_code, globals(), this_locals)
+    exec(python_code, this_locals, this_locals)
 
     builder.build_colr(this_locals["glyphs"])
     builder.build_palette()
