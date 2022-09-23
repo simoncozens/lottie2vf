@@ -1,6 +1,5 @@
 from fontTools.ttLib import TTFont
 import argparse
-from datadiff import diff
 from fontTools.colorLib.builder import buildCOLR, buildCPAL
 from fontTools.varLib.varStore import OnlineVarStoreBuilder
 from fontTools.varLib.builder import buildDeltaSetIndexMap
